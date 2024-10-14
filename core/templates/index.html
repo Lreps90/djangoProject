@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save a Message</title>
+</head>
+<body>
+    <h1>Save Your Message</h1>
+
+    <!-- Input field for message -->
+    <input type="text" id="inputMessage" placeholder="Enter a message">
+
+    <!-- Button to trigger saveData function -->
+    <button onclick="saveData()">Save to File</button>
+
+    <!-- Response message area -->
+    <p id="response"></p>
+
+    <h2>Download Saved Messages</h2>
+
+    <!-- Button to trigger file download -->
+    <button onclick="downloadFile()">Download File</button>
+
+    <!-- Link to the code editor page -->
+    <a href="/code_editor">Go to Python Code Editor</a>
+
+    <!-- Inline JavaScript for CSRF and AJAX handling -->
+    <script>
+        // Function to get the CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Get the CSRF token using the getCookie function
+        const csrftoken = getCookie('csrftoken');
+
+        // Function to save data via POST request with CSRF token
+        function saveData() {
+            const message = document.getElementById("inputMessage").value;
+
+            // Make POST request to Django backend with CSRF token in the headers
+            fetch('/api/save/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrftoken  // Include CSRF token in the headers
+                },
+                body: new URLSearchParams({
+                    message: message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Display the response from Django in the browser
+                document.getElementById("response").innerHTML = data.response;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Function to download the saved messages
+        function downloadFile() {
+            // Redirect the browser to the download endpoint
+            window.location.href = '/download/';
+        }
+    </script>
+    <form method="POST">
+    {% csrf_token %}
+</form>
+
+</body>
+</html>

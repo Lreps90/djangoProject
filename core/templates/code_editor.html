@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Code Editor</title>
+
+    <!-- Include CodeMirror CSS for the code editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/theme/monokai.min.css">
+
+    <!-- Inline styles for layout -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #2d2d2d;
+            color: #ffffff;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Layout for the page: code editor on the left, output on the right */
+        .container {
+            display: flex;
+            width: 100%;
+        }
+
+        .editor {
+            width: 50%;
+            padding: 20px;
+            background-color: #1e1e1e;
+        }
+
+        .output {
+            width: 50%;
+            padding: 20px;
+            background-color: #2d2d2d;
+            overflow-y: auto;
+        }
+
+        /* CodeMirror editor styling */
+        .CodeMirror {
+            height: 80vh;
+        }
+
+        /* Button styling */
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main container to hold the editor and output side by side -->
+    <div class="container">
+        <!-- Code editor section -->
+        <div class="editor">
+            <h2>Python Code Editor</h2>
+            <textarea id="codeEditor" name="editor"></textarea>
+            <button id="runButton">Run Code</button>
+        </div>
+
+        <!-- Output section -->
+        <div class="output">
+            <h2>Output</h2>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <!-- Include CodeMirror and Python mode -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/mode/python/python.min.js"></script>
+
+    <!-- Inline JavaScript -->
+    <script>
+        // Initialize CodeMirror editor
+        let editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
+            lineNumbers: true,
+            mode: "python",
+            theme: "monokai"
+        });
+
+        // Function to fetch CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Get CSRF token
+        const csrftoken = getCookie('csrftoken');
+
+        // Function to run the code and fetch output
+        function runCode() {
+            const userCode = editor.getValue();  // Get the code from CodeMirror editor
+
+            fetch('/run_stream/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrftoken  // Include CSRF token
+                },
+                body: new URLSearchParams({ code: userCode })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.body.getReader();  // Read the response stream
+            })
+            .then(reader => {
+                const outputElement = document.getElementById('output');
+                outputElement.textContent = '';  // Clear previous output
+
+                const decoder = new TextDecoder();
+
+                // Function to read the output stream and append to output
+                function readChunk() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            return;  // Stop if there's no more data
+                        }
+
+                        const chunk = decoder.decode(value);
+                        outputElement.textContent += chunk;  // Append output to the right side
+                        readChunk();  // Keep reading chunks
+                    });
+                }
+
+                readChunk();  // Start reading the output stream
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Attach event listener to the run button
+        document.getElementById("runButton").addEventListener("click", runCode);
+    </script>
+
+</body>
+</html>
